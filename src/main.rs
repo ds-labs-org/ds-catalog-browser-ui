@@ -18,13 +18,18 @@ fn main() {
 /// `web_sys::window()` and drives a browser `fetch` via `reqwest`; the
 /// fetch-and-map pipeline it drives is otherwise identical to what
 /// `crate::mapping`'s host-testable unit tests exercise directly.
+///
+/// Rendered with real `patternfly-yew` components, themed the same way as
+/// `dataspace-rs/edc-web-ui` (see that project's `Cargo.toml`/`Trunk.toml`/
+/// `index.html` and its `edc-web-components::ListFederatedCatalogOffers`,
+/// which this table is modelled on).
 #[cfg(target_arch = "wasm32")]
 mod app {
     use crate::configuration::Configuration;
     use crate::endpoint::derive_client_endpoint;
     use crate::mapping::{map_offers_to_rows, OfferRow};
     use edc_federated_catalog_client::{FederatedCatalogClient, FederatedCatalogClientVersion};
-    use std::collections::HashSet;
+    use patternfly_yew::prelude::*;
     use yew::platform::spawn_local;
     use yew::prelude::*;
 
@@ -43,7 +48,6 @@ mod app {
     #[function_component(App)]
     pub fn app() -> Html {
         let state = use_state(|| LoadState::Loading);
-        let expanded = use_state(HashSet::<String>::new);
 
         {
             let state = state.clone();
@@ -65,8 +69,11 @@ mod app {
                     };
 
                     let version = FederatedCatalogClientVersion::V4;
-                    let endpoint =
-                        derive_client_endpoint(&origin, &configuration.catalog_path, &version.to_string());
+                    let endpoint = derive_client_endpoint(
+                        &origin,
+                        &configuration.catalog_path,
+                        &version.to_string(),
+                    );
 
                     let client = FederatedCatalogClient::new(
                         reqwest::Client::new(),
@@ -85,117 +92,59 @@ mod app {
             });
         }
 
-        html! {
-            <div class="page">
-                <header>
-                    <h1>{ "DS Catalog Browser" }</h1>
-                    <p class="subtitle">
-                        { "Offers currently known to the DSP Catalog Broker" }
-                    </p>
-                </header>
-                <main>
-                    { render_state(&state, &expanded) }
-                </main>
-            </div>
-        }
+        let brand = html!(
+            <Title level={Level::H3} size={Size::XXLarge}>{ "DS Catalog Browser" }</Title>
+        );
+
+        html!(
+            <Page {brand} full_height=true>
+                <PageSection>
+                    <Stack gutter=true>
+                        <StackItem>
+                            <Content>
+                                <p>{ "Offers currently known to the DSP Catalog Broker" }</p>
+                            </Content>
+                        </StackItem>
+                        <StackItem>
+                            { render_state(&state) }
+                        </StackItem>
+                    </Stack>
+                </PageSection>
+            </Page>
+        )
     }
 
-    fn render_state(state: &LoadState, expanded: &UseStateHandle<HashSet<String>>) -> Html {
+    fn render_state(state: &LoadState) -> Html {
         match state {
-            LoadState::Loading => html! {
-                <p class="status status-loading" role="status">{ "Loading offers..." }</p>
-            },
-            LoadState::ConfigError(message) => html! {
-                <p class="status status-error" role="alert">
-                    { "Could not load configuration.json: " }{ message }
-                </p>
-            },
-            LoadState::FetchError(message) => html! {
-                <p class="status status-error" role="alert">
-                    { "Could not reach the catalog broker: " }{ message }
-                </p>
-            },
-            LoadState::Loaded(rows) if rows.is_empty() => html! {
-                <p class="status status-empty">{ "No offers were returned by the broker." }</p>
-            },
-            LoadState::Loaded(rows) => render_table(rows, expanded),
-        }
-    }
-
-    fn render_table(rows: &[OfferRow], expanded: &UseStateHandle<HashSet<String>>) -> Html {
-        html! {
-            <table class="offers">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>{ "Participant ID" }</th>
-                        <th>{ "Originator" }</th>
-                        <th>{ "Datasets" }</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    { for rows.iter().map(|row| render_offer_rows(row, expanded)) }
-                </tbody>
-            </table>
-        }
-    }
-
-    fn render_offer_rows(row: &OfferRow, expanded: &UseStateHandle<HashSet<String>>) -> Html {
-        let key = row.participant_id.clone();
-        let is_expanded = expanded.contains(&key);
-        let can_expand = row.dataset_count > 0;
-
-        let onclick = {
-            let expanded = expanded.clone();
-            let key = key.clone();
-            Callback::from(move |_| {
-                let mut next = (*expanded).clone();
-                if !next.insert(key.clone()) {
-                    next.remove(&key);
-                }
-                expanded.set(next);
-            })
-        };
-
-        let toggle = if can_expand {
-            html! {
-                <button
-                    type="button"
-                    class="toggle"
-                    aria-expanded={is_expanded.to_string()}
-                    onclick={onclick}
+            LoadState::Loading => html!(
+                <Bullseye>
+                    <Spinner size={SpinnerSize::Xl} aria_label="Loading offers" />
+                </Bullseye>
+            ),
+            LoadState::ConfigError(message) => html!(
+                <Alert
+                    r#type={AlertType::Danger}
+                    title="Could not load configuration.json"
+                    inline=true
                 >
-                    { if is_expanded { "\u{25be}" } else { "\u{25b8}" } }
-                </button>
-            }
-        } else {
-            html! { <span class="toggle toggle-disabled">{ "\u{2013}" }</span> }
-        };
-
-        html! {
-            <>
-                <tr class="offer-row">
-                    <td>{ toggle }</td>
-                    <td>{ &row.participant_id }</td>
-                    <td>{ &row.originator }</td>
-                    <td>{ row.dataset_count }</td>
-                </tr>
-                if is_expanded && can_expand {
-                    <tr class="dataset-row">
-                        <td></td>
-                        <td colspan="3">
-                            <ul class="datasets">
-                                { for row.datasets.iter().map(|dataset| html! {
-                                    <li>
-                                        <span class="dataset-name">{ &dataset.name }</span>
-                                        <span class="dataset-id">{ &dataset.id }</span>
-                                    </li>
-                                }) }
-                            </ul>
-                        </td>
-                    </tr>
-                }
-            </>
+                    <p>{ message.clone() }</p>
+                </Alert>
+            ),
+            LoadState::FetchError(message) => html!(
+                <Alert
+                    r#type={AlertType::Danger}
+                    title="Could not reach the catalog broker"
+                    inline=true
+                >
+                    <p>{ message.clone() }</p>
+                </Alert>
+            ),
+            LoadState::Loaded(rows) if rows.is_empty() => html!(
+                <EmptyState title="No offers" icon={Icon::Cubes}>
+                    <p>{ "No offers were returned by the broker." }</p>
+                </EmptyState>
+            ),
+            LoadState::Loaded(rows) => html!(<OffersTable rows={rows.clone()} />),
         }
     }
 
@@ -212,5 +161,84 @@ mod app {
             .json::<Configuration>()
             .await
             .map_err(|error| error.to_string())
+    }
+
+    #[derive(Clone, PartialEq, Properties)]
+    struct OffersTableProps {
+        rows: Vec<OfferRow>,
+    }
+
+    /// The offers table itself, kept as its own component so the
+    /// `use_table_data`/`use_memo` hooks it needs to track row-expansion
+    /// state are only ever called while offers are actually loaded, never
+    /// skipped across renders of `App` (which would otherwise vary the
+    /// hook call order between `LoadState` variants).
+    #[function_component(OffersTable)]
+    fn offers_table(props: &OffersTableProps) -> Html {
+        let header = html_nested!(
+            <TableHeader<Columns>>
+                <TableColumn<Columns> label="Participant ID" index={Columns::ParticipantId} />
+                <TableColumn<Columns> label="Originator" index={Columns::Originator} />
+                <TableColumn<Columns> label="Datasets" index={Columns::DatasetCount} />
+            </TableHeader<Columns>>
+        );
+
+        let entries = use_memo(props.rows.clone(), |rows| {
+            rows.iter().cloned().map(OfferEntry).collect::<Vec<_>>()
+        });
+        let (entries, onexpand) = use_table_data(MemoizedTableModel::new(entries));
+
+        html!(
+            <Table<Columns, UseTableData<Columns, MemoizedTableModel<OfferEntry>>>
+                mode={TableMode::CompactExpandable}
+                {header}
+                {entries}
+                {onexpand}
+            />
+        )
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum Columns {
+        ParticipantId,
+        Originator,
+        DatasetCount,
+    }
+
+    /// One offers-table row. Wraps `OfferRow` so it can implement
+    /// `TableEntryRenderer` without that (pure, host-testable) type having
+    /// to depend on `patternfly-yew` itself.
+    #[derive(Clone, Debug, PartialEq)]
+    struct OfferEntry(OfferRow);
+
+    impl TableEntryRenderer<Columns> for OfferEntry {
+        fn render_cell(&self, context: CellContext<'_, Columns>) -> Cell {
+            match context.column {
+                Columns::ParticipantId => html!(self.0.participant_id.clone()),
+                Columns::Originator => html!(self.0.originator.clone()),
+                Columns::DatasetCount => html!(self.0.dataset_count.to_string()),
+            }
+            .into()
+        }
+
+        fn render_details(&self) -> Vec<Span> {
+            let content = if self.0.datasets.is_empty() {
+                html!(<p>{ "This offer has no datasets." }</p>)
+            } else {
+                html!(
+                    <List r#type={ListType::Plain}>
+                        { for self.0.datasets.iter().map(|dataset| html_nested!(
+                            <ListItem>
+                                <strong>{ &dataset.name }</strong>
+                                { " \u{2014} " }
+                                <code>{ &dataset.id }</code>
+                            </ListItem>
+                        )) }
+                    </List>
+                )
+            };
+
+            vec![Span::max(content)]
+        }
     }
 }

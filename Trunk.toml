@@ -2,6 +2,17 @@
 target = "index.html"
 dist = "dist"
 
+# Same PatternFly/FontAwesome asset versions as dataspace-rs/edc-web-ui, so
+# this app is themed identically - see index.html for how Trunk wires the
+# CSS/fonts these packages provide into the build.
+[[node_packages]]
+name = "@patternfly/patternfly"
+version = "6.4.0"
+
+[[node_packages]]
+name = "@fortawesome/fontawesome-free"
+version = "7.1.0"
+
 # For local `trunk serve` against a real broker, uncomment and point this at
 # a reachable DSP Catalog Broker management API. In a real deployment this
 # proxying is done by nginx in front of the built app instead - see README.md.

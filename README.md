@@ -14,6 +14,15 @@ crate (`FederatedCatalogClient::list_offers()`), not the full
 ...); this app is deliberately much smaller and read-only, purpose-built for
 browsing one federated catalog's offers and nothing else.
 
+It is, however, rendered with the real
+[`patternfly-yew`](https://github.com/patternfly-yew/patternfly-yew)
+component library, at the same version and PatternFly/FontAwesome asset
+versions as `dataspace-rs/edc-web-ui`, so it looks visually at home next to
+it rather than like an unstyled prototype: a `Page`/`PageSection` layout, a
+`Spinner` while loading, an `Alert` on error, and an expandable `Table` for
+the offers themselves (modelled on `edc-web-components`'s own
+`ListFederatedCatalogOffers`).
+
 ## configuration.json
 
 Fetched at runtime from the app's own origin, same pattern as
