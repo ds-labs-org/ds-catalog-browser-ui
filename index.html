@@ -13,6 +13,13 @@
     <link data-trunk rel="copy-dir" href="target/node_modules/@fortawesome/fontawesome-free/7.1.0/webfonts">
 
     <link data-trunk rel="copy-file" href="configuration.json" />
+
+    <!-- Bundled per-dataset illustrations (one demo SVG per known
+         harvest-d/harvest-e dataset id), served same-origin at
+         /assets/datasets/<id>.svg once nginx serves dist/ - see
+         src/mapping.rs's DatasetRow::thumbnail and app::render_dataset_thumbnail
+         in src/main.rs for how the UI consumes them. -->
+    <link data-trunk rel="copy-dir" href="assets/datasets" data-target-path="assets/datasets" />
 </head>
 <body>
 </body>

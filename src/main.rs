@@ -27,7 +27,7 @@ fn main() {
 mod app {
     use crate::configuration::Configuration;
     use crate::endpoint::derive_client_endpoint;
-    use crate::mapping::{map_offers_to_rows, OfferRow};
+    use crate::mapping::{map_offers_to_rows, DatasetRow, OfferRow};
     use edc_federated_catalog_client::{FederatedCatalogClient, FederatedCatalogClientVersion};
     use patternfly_yew::prelude::*;
     use yew::platform::spawn_local;
@@ -228,17 +228,82 @@ mod app {
                 html!(
                     <List r#type={ListType::Plain}>
                         { for self.0.datasets.iter().map(|dataset| html_nested!(
-                            <ListItem>
-                                <strong>{ &dataset.name }</strong>
-                                { " \u{2014} " }
-                                <code>{ &dataset.id }</code>
-                            </ListItem>
+                            <ListItem>{ render_dataset(dataset) }</ListItem>
                         )) }
                     </List>
                 )
             };
 
             vec![Span::max(content)]
+        }
+    }
+
+    /// Renders one dataset the way it appears in an offer's expanded row:
+    /// its thumbnail (or a placeholder when it has none) beside its title,
+    /// version, id, description and keywords. `title`/`description`/
+    /// `version`/`thumbnail` are all optional on the wire (see
+    /// `edc_federated_catalog_client::models::Dataset`) and `keywords` may
+    /// be empty, so every one of these is conditionally rendered rather
+    /// than assumed present.
+    fn render_dataset(dataset: &DatasetRow) -> Html {
+        html!(
+            <Flex space_items={SpaceItems::Medium.all()}>
+                <FlexItem>{ render_dataset_thumbnail(dataset) }</FlexItem>
+                <FlexItem>
+                    <p>
+                        <strong>{ &dataset.display_title }</strong>
+                        if let Some(version) = &dataset.version {
+                            { " " }
+                            <Badge>{ format!("v{version}") }</Badge>
+                        }
+                        { " \u{2014} " }
+                        <code>{ &dataset.id }</code>
+                    </p>
+                    if let Some(description) = &dataset.description {
+                        <p>{ description.clone() }</p>
+                    }
+                    if !dataset.keywords.is_empty() {
+                        <Flex space_items={SpaceItems::Small.all()}>
+                            { for dataset.keywords.iter().map(|keyword| html_nested!(
+                                <FlexItem><Label label={keyword.clone()} compact=true /></FlexItem>
+                            )) }
+                        </Flex>
+                    }
+                </FlexItem>
+            </Flex>
+        )
+    }
+
+    /// A dataset's `thumbnail.resource` is expected to be a same-origin
+    /// path (e.g. `/assets/datasets/HARVEST-D-01.svg`, bundled into this
+    /// app's own `dist/assets/datasets/` at build time) so it is `img`
+    /// `src`'d directly - no cross-origin fetch is involved. When the
+    /// broker hasn't populated a thumbnail for a dataset yet, a small
+    /// unobtrusive placeholder icon is shown instead of a broken-image
+    /// icon.
+    fn render_dataset_thumbnail(dataset: &DatasetRow) -> Html {
+        const SIZE: &str = "48px";
+
+        match &dataset.thumbnail {
+            Some(resource) => html!(
+                <img
+                    src={resource.clone()}
+                    alt={format!("Thumbnail for {}", dataset.display_title)}
+                    width="48"
+                    height="48"
+                    style={format!("width:{SIZE};height:{SIZE};object-fit:cover;border-radius:3px;")}
+                />
+            ),
+            None => html!(
+                <span
+                    aria-hidden="true"
+                    style={format!(
+                        "display:inline-flex;align-items:center;justify-content:center;width:{SIZE};height:{SIZE};color:var(--pf-t--global--icon--color--disabled, #6a6e73);"
+                    )}
+                >
+                    { Icon::Image.as_html() }
+                </span>
+            ),
         }
     }
 }
