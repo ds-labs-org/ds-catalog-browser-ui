@@ -1,0 +1,10 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+# For local `trunk serve` against a real broker, uncomment and point this at
+# a reachable DSP Catalog Broker management API. In a real deployment this
+# proxying is done by nginx in front of the built app instead - see README.md.
+# [[proxy]]
+# rewrite = "/api/management/v4/catalogs/request"
+# backend = "http://localhost:28000/api/management/v4/catalogs/request"
